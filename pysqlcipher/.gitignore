@@ -1,0 +1,7 @@
+amalgamation
+build
+*.pyc
+dist/
+MANIFEST
+debian/
+*.egg-info

@@ -21,8 +21,6 @@
 # 2. Altered source versions must be plainly marked as such, and must not be
 #    misrepresented as being the original software.
 # 3. This notice may not be removed or altered from any source distribution.
-
-import glob
 import os
 import re
 import sys
@@ -31,13 +29,14 @@ import zipfile
 
 from types import ListType, TupleType
 
-from distutils.core import setup, Extension, Command
-#from setuptools import setup, Extension, Command
 from distutils.command.build import build
 from distutils.command.build_ext import build_ext
 from distutils.dep_util import newer_group
 from distutils.errors import DistutilsSetupError
 from distutils import log
+
+import setuptools
+from setuptools import Extension, Command
 
 import cross_bdist_wininst
 
@@ -47,8 +46,9 @@ sqlite = "sqlite"
 
 PYSQLITE_EXPERIMENTAL = False
 
-#DEV_VERSION = None
-DEV_VERSION = "1"
+DEV_VERSION = None
+
+PATCH_VERSION = "1"
 
 sources = ["src/module.c", "src/connection.c", "src/cursor.c", "src/cache.c",
            "src/microprotocols.c", "src/prepare_protocol.c", "src/statement.c",
@@ -56,6 +56,12 @@ sources = ["src/module.c", "src/connection.c", "src/cursor.c", "src/cache.c",
 
 if PYSQLITE_EXPERIMENTAL:
     sources.append("src/backup.c")
+
+
+if sys.platform == "darwin":
+    # Work around clang raising hard error for unused arguments
+    os.environ['CFLAGS'] = "-Qunused-arguments"
+    print "CFLAGS", os.environ['CFLAGS']
 
 include_dirs = []
 library_dirs = []
@@ -110,8 +116,7 @@ def get_amalgamation():
     os.mkdir(AMALGAMATION_ROOT)
     print "Downloading amalgation."
 
-    # XXX upload the amalgamation file to a somewhat more
-    # official place
+    # XXX upload the amalgamation file to downloads.leap.se
     amalgamation_url = ("http://futeisha.org/sqlcipher/"
                         "amalgamation-sqlcipher-2.1.0.zip")
 
@@ -140,6 +145,16 @@ class AmalgamationBuilder(build):
         MyBuildExt.amalgamation = True
         MyBuildExt.static = True
         build.__init__(self, *args, **kwargs)
+
+
+class LibSQLCipherBuilder(build_ext):
+
+    description = ("Build C extension linking against libsqlcipher library.")
+
+    def build_extension(self, ext):
+        ext.extra_compile_args.append("-I/usr/include/sqlcipher/")
+        ext.extra_link_args.append("-lsqlcipher")
+        build_ext.build_extension(self, ext)
 
 
 class MyBuildExt(build_ext):
@@ -215,8 +230,6 @@ class MyBuildExt(build_ext):
         for undef in ext.undef_macros:
             macros.append((undef,))
 
-        # XXX debug
-        #objects = []
         objects = self.compiler.compile(sources,
                                         output_dir=self.build_temp,
                                         macros=macros,
@@ -290,26 +303,19 @@ def get_setup_args():
             break
     f.close()
 
-    if DEV_VERSION:
-        PYSQLITE_VERSION += ".dev%s" % DEV_VERSION
-
     if not PYSQLITE_VERSION:
         print "Fatal error: PYSQLITE_VERSION could not be detected!"
         sys.exit(1)
 
-    data_files = [("pysqlcipher-doc",
-                  glob.glob("doc/*.html")
-                  + glob.glob("doc/*.txt")
-                  + glob.glob("doc/*.css")),
-                  ("pysqlcipher-doc/code",
-                  glob.glob("doc/code/*.py"))]
+    if DEV_VERSION:
+        PYSQLITE_VERSION += ".dev%s" % DEV_VERSION
 
-    py_modules = ["sqlcipher"],
+    if PATCH_VERSION:
+        PYSQLITE_VERSION += "-%s" % PATCH_VERSION
 
     setup_args = dict(
         name="pysqlcipher",
         version=PYSQLITE_VERSION,
-        #version="0.0.1",
         description="DB-API 2.0 interface for SQLCIPHER 3.x",
         long_description=long_description,
         author="Kali Kaneko",
@@ -317,15 +323,12 @@ def get_setup_args():
         license="zlib/libpng",  # is THIS a license?
         # It says MIT in the google project
         platforms="ALL",
-        #XXX missing url
         url="http://github.com/leapcode/pysqlcipher/",
         # Description of the modules and packages in the distribution
         package_dir={"pysqlcipher": "lib"},
         packages=["pysqlcipher", "pysqlcipher.test"] +
             (["pysqlcipher.test.py25"], [])[sys.version_info < (2, 5)],
         scripts=[],
-        data_files=data_files,
-
         ext_modules=[
             Extension(
                 name="pysqlcipher._sqlite",
@@ -338,7 +341,7 @@ def get_setup_args():
                 define_macros=define_macros)
         ],
         classifiers=[
-            "Development Status :: 5 - Production/Stable",
+            "Development Status :: 4 - Beta",
             "Intended Audience :: Developers",
             "License :: OSI Approved :: zlib/libpng License",
             "Operating System :: MacOS :: MacOS X",
@@ -355,12 +358,13 @@ def get_setup_args():
         {"build_docs": DocBuilder,
          "build_ext": MyBuildExt,
          "build_static": AmalgamationBuilder,
+         "build_sqlcipher": LibSQLCipherBuilder,
          "cross_bdist_wininst": cross_bdist_wininst.bdist_wininst})
     return setup_args
 
 
 def main():
-    setup(**get_setup_args())
+    setuptools.setup(**get_setup_args())
 
 if __name__ == "__main__":
     main()
