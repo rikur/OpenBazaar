@@ -48,6 +48,7 @@ class TransportLayer(object):
         self.market_id = market_id
         self.nickname = nickname
         self.handler = None
+        self.ctx = None
 
         try:
             socket.inet_pton(socket.AF_INET6, my_ip)
