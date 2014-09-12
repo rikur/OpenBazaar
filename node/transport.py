@@ -89,6 +89,12 @@ class TransportLayer(object):
 
     def listen(self, pubkey):
         self.log.info("Listening at: %s:%s" % (self.ip, self.port))
+        if self.ctx is not None:
+            # ctx already existed, IP changed.
+            try:
+                self.ctx.destroy(linger=None)
+            except:
+                pass
         self.ctx = zmq.Context()
         self.socket = self.ctx.socket(zmq.REP)
 
