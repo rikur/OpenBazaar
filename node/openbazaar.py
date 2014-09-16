@@ -1,5 +1,33 @@
 #!./env/bin/python
+# OpenBazaar's launcher script.
 import argparse
+import os
+from network_util import check_NAT_status
+
+
+def is_osx():
+    return os.uname()[0].startswith('Darwin')
+
+
+def osx_check_dyld_library_path():
+    '''This is a necessary workaround as you cannot set the DYLD_LIBRARY_PATH by the time python has started.'''
+    if 'DYLD_LIBRARY_PATH' not in os.environ or len(os.environ['DYLD_LIBRARY_PATH']) == 0:
+        print 'WARNING: DYLD_LIBRARY_PATH not set, this might cause issues with openssl elliptic curve cryptography and other libraries.'
+        print "It is recommended that you stop OpenBazaar and set your DYLD_LIBRARY_PATH environment variable as follows\n"
+        print 'export DYLD_LIBRARY_PATH=$(brew --prefix openssl)/lib:${DYLD_LIBRARY_PATH}', "\n"
+        print 'then restart OpenBazaar.', "\n"
+
+        from ctypes import cdll
+        try:
+            print "Attempting to load libcrypto.dylib and libssl.dylib."
+            openssl_prefix = os.popen('brew --prefix openssl')
+            if openssl_prefix is not None:
+                cdll.LoadLibrary(openssl_prefix + '/lib/libcrypto.dylib')
+                cdll.LoadLibrary(openssl_prefix + '/lib/libssl.dylib')
+                print "Attempting to load libcrypto.dylib and libssl.dylib."
+        except:
+            pass
+
 
 def initArgumentParser():
     parser = argparse.ArgumentParser(usage=usage())
@@ -76,6 +104,23 @@ def initArgumentParser():
     parser.add_argument('command')
     return parser
 
+
+def getDefaults():
+    return {'SERVER_PORT': 12345,
+            'LOGDIR': 'logs',
+            'LOG_FILE': 'production.log',
+            'DBDIR': 'db',
+            'DEVELOPMENT': False,
+            'SEED_URI': 'seed.openbazaar.org seed2.openbazaar.org seed.openlabs.co us.seed.bizarre.company eu.seed.bizarre.company'.split(),
+            'DISABLE_UPNP': False,
+            'DISABLE_OPEN_DEFAULT_WEBBROWSER': False,
+            'LOG_LEVEL': 10,  # CRITICAL=50, ERROR=40, WARNING=30, DEBUG=10, NOTSET=0
+            'NODES': 3,
+            'HTTP_IP': '127.0.0.1',
+            'HTTP_PORT': -1
+            }
+
+
 def usage():
     return """
 openbazaar [options] <command>
@@ -141,7 +186,21 @@ if __name__ == '__main__':
 
     parser = initArgumentParser()
     arguments = parser.parse_args()
-    #print arguments
+
+    if is_osx():
+        osx_check_dyld_library_path()
+
+    defaults = getDefaults()
+
+    print "Checking NAT Status..."
+    nat_status = check_NAT_status()
+
+    if arguments.server_public_ip is not None:
+        my_market_ip = arguments.server_public_ip
+    else:
+        print nat_status
+        my_market_ip = nat_status['external_ip']
+
     """
     import openbazaar_daemon
     openbazaar_daemon.start_node(my_market_ip,
@@ -154,7 +213,7 @@ if __name__ == '__main__':
                                  bm_pass,
                                  bm_port,
                                  seed_peers,
-                                 seed_mode, 
+                                 seed_mode,
                                  dev_mode,
                                  log_level,
                                  database,
