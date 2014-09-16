@@ -41,7 +41,7 @@ def initArgumentParser():
 
     parser.add_argument('-k', '--http-ip', '--web-ip',
                         default='127.0.0.1',
-                        help='Web Interface IP (default 127.0.0.1;' +
+                        help='Web Interface IP (default 127.0.0.1;' + 
                         ' use 0.0.0.0 for any)')
 
     parser.add_argument('-q', '--web-port', '--http-port',
@@ -95,7 +95,7 @@ def initArgumentParser():
     parser.add_argument('--disable-open-browser',
                         action='store_true',
                         default=False,
-                        help='Don\'t open preferred web browser ' +
+                        help='Don\'t open preferred web browser ' + 
                         'automatically on start')
     parser.add_argument('--config-file',
                         default=None,
@@ -107,17 +107,18 @@ def initArgumentParser():
 
 def getDefaults():
     return {'SERVER_PORT': 12345,
-            'LOGDIR': 'logs',
+            'LOG_DIR': 'logs',
             'LOG_FILE': 'production.log',
-            'DBDIR': 'db',
+            'DB_DIR': 'db',
+            'DB_FILE': 'ob.db',
             'DEVELOPMENT': False,
-            'SEED_URI': 'seed.openbazaar.org seed2.openbazaar.org seed.openlabs.co us.seed.bizarre.company eu.seed.bizarre.company'.split(),
+            'SEED_HOSTNAMES': 'seed.openbazaar.org seed2.openbazaar.org seed.openlabs.co us.seed.bizarre.company eu.seed.bizarre.company'.split(),
             'DISABLE_UPNP': False,
             'DISABLE_OPEN_DEFAULT_WEBBROWSER': False,
             'LOG_LEVEL': 10,  # CRITICAL=50, ERROR=40, WARNING=30, DEBUG=10, NOTSET=0
             'NODES': 3,
             'HTTP_IP': '127.0.0.1',
-            'HTTP_PORT': -1
+            'HTTP_PORT':-1
             }
 
 
@@ -193,6 +194,7 @@ def start(arguments, defaults):
     # through the command line.
 
     # market ip
+    print arguments
     my_market_ip = ''
     if arguments.server_public_ip is not None:
         my_market_ip = arguments.server_public_ip
@@ -202,12 +204,14 @@ def start(arguments, defaults):
 
     # market port
     my_market_port = defaults['SERVER_PORT']
-    if arguments.server_public_port is not None:
+    if arguments.server_public_port is not None and arguments.server_public_port != my_market_port:
         my_market_port = arguments.server_public_port
     else:
         import stun
         # let's try the external port if we're behind
         # a non symmetric nat
+        print stun.SymmetricNAT
+        print stun.SymmetricUDPFirewall
         if nat_status['nat_type'] not in (stun.SymmetricNAT,
                                           stun.SymmetricUDPFirewall):
             my_market_port = nat_status['external_port']
@@ -219,20 +223,90 @@ def start(arguments, defaults):
 
     # http port
     http_port = defaults['HTTP_PORT']
-    if arguments.http_port is not None:
-        http_port = arguments.http_port
+    if arguments.web_port is not None and arguments.web_port != http_port:
+        http_port = arguments.web_port
+
+    # log file
+    log_path = defaults['LOG_DIR'] + os.sep + defaults['LOG_FILE']
+    if arguments.log is not None and arguments.log != log_path:
+        log_path = arguments.log
+    #TODO: Create log directory if it doesn't exist
+
+    # market id
+    market_id = None
+    if arguments.market_id is not None:
+        market_id = arguments.market_id
+
+    # bm user
+    # bm_user = 
+
+    # bm pass
+
+    # bm port
+
+    # seed_peers
+    seed_peers = defaults['SEED_HOSTNAMES']
+    if len(arguments.seeds) > 0:
+        seed_peers = seed_peers + arguments.seeds
+
+    # seed_mode
+    seed_mode = False
+    if arguments.seed_mode:
+        seed_mode = True
+
+    # dev_mode
+    dev_mode = defaults['DEVELOPMENT']
+    if arguments.development_mode != dev_mode:
+        dev_mode = arguments.development_mode
+
+    # log level
+    log_level = defaults['LOG_LEVEL']
+
+
+    # database
+    database = defaults['DB_DIR'] + os.sep + defaults['DB_FILE']
+    if arguments.database != database:
+        database = arguments.database
+    
+    #TODO: Create database folder and file if it doesn't exist.
+
+    # disable upnp
+    disable_upnp = defaults['DISABLE_UPNP']
+    if arguments.disable_upnp:
+        disable_upnp = True
+
+    # disable open browser
+    disable_open_browser = defaults['DISABLE_OPEN_DEFAULT_WEBBROWSER']
+    if arguments.disable_open_browser:
+        disable_open_browser = True
+
+    
 
     print "my_market_ip", my_market_ip
     print "my_market_port", my_market_port
     print "http_ip", http_ip
     print "http_port", http_port
+    print "log_path", log_path
+    print "market_id", market_id
+    print "bm_user", bm_user,
+    print "bm_pass", bm_pass,
+    print "bm_port", bm_port,
+    print "seed_peers", seed_peers
+    print "seed_mode", seed_mode
+    print "dev_mode", dev_mode
+    print "log_level", log_level
+    print "database", database
+    print "disable_upnp", disable_upnp
+    print "disable_open_browser", disable_open_browser
+    
 
+"""
     import openbazaar_daemon
     openbazaar_daemon.start_node(my_market_ip,
                                  my_market_port,
                                  http_ip,
                                  http_port,
-                                 log_file,
+                                 log_path,
                                  market_id,
                                  bm_user,
                                  bm_pass,
@@ -244,6 +318,7 @@ def start(arguments, defaults):
                                  database,
                                  disable_upnp,
                                  disable_open_browser)
+"""                                 
 
 
 if __name__ == '__main__':
