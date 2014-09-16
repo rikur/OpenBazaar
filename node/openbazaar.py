@@ -182,26 +182,51 @@ openbazaar [options] <command>
 
 """
 
-if __name__ == '__main__':
 
-    parser = initArgumentParser()
-    arguments = parser.parse_args()
-
-    if is_osx():
-        osx_check_dyld_library_path()
-
-    defaults = getDefaults()
-
+def start(arguments, defaults):
     print "Checking NAT Status..."
     nat_status = check_NAT_status()
 
+    # TODO: if a --config file has been specified
+    # first load config values from it
+    # then override the rest that has been passed
+    # through the command line.
+
+    # market ip
+    my_market_ip = ''
     if arguments.server_public_ip is not None:
         my_market_ip = arguments.server_public_ip
     else:
         print nat_status
         my_market_ip = nat_status['external_ip']
 
-    """
+    # market port
+    my_market_port = defaults['SERVER_PORT']
+    if arguments.server_public_port is not None:
+        my_market_port = arguments.server_public_port
+    else:
+        import stun
+        # let's try the external port if we're behind
+        # a non symmetric nat
+        if nat_status['nat_type'] not in (stun.SymmetricNAT,
+                                          stun.SymmetricUDPFirewall):
+            my_market_port = nat_status['external_port']
+
+    # http ip
+    http_ip = defaults['HTTP_IP']
+    if arguments.http_ip is not None:
+        http_ip = arguments.http_ip
+
+    # http port
+    http_port = defaults['HTTP_PORT']
+    if arguments.http_port is not None:
+        http_port = arguments.http_port
+
+    print "my_market_ip", my_market_ip
+    print "my_market_port", my_market_port
+    print "http_ip", http_ip
+    print "http_port", http_port
+
     import openbazaar_daemon
     openbazaar_daemon.start_node(my_market_ip,
                                  my_market_port,
@@ -219,4 +244,21 @@ if __name__ == '__main__':
                                  database,
                                  disable_upnp,
                                  disable_open_browser)
-    """
+
+
+if __name__ == '__main__':
+
+    parser = initArgumentParser()
+    arguments = parser.parse_args()
+
+    if is_osx():
+        osx_check_dyld_library_path()
+
+    defaults = getDefaults()
+    print "Command:", arguments.command
+    if arguments.command == 'start':
+        start(arguments, defaults)
+    elif arguments.command == 'stop':
+        pass
+    elif arguments.command == 'status':
+        pass
